@@ -1,0 +1,67 @@
+from gevent import monkey
+monkey.patch_all()
+import socket
+import gevent
+import sys
+
+
+class Server_Http(object):
+    def __init__(self,port):
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(("", port))
+        server_socket.listen(128)
+        self.server_socket = server_socket
+    def Server_web(self,client_socket):
+        self.client_socket = client_socket
+        client_data = client_socket.recv(4096)
+        if not client_data:
+            print("客户端已经关闭")
+            client_socket.close()
+            return
+
+        client_str_data = client_data.decode()
+        client_line = client_str_data.split("\r\n")[0]
+        path_info = client_line.split(" ")[1]
+        print(path_info)
+        if path_info == '/':
+            path_info = '/index.html'
+        try:
+            with open("./static" + path_info, "rb") as file:
+                file_data = file.read()
+        except Exception as e:
+            response_line = "HTTP/1.1 404 Not Found\r\n"
+            response_headr = "s\ServerPython2.0\r\n"
+            response_body = "404 Not Found"
+            response_data = response_line + response_headr + "\r\n" + response_body
+            client_socket.send(response_data.encode())
+        else:
+            response_line = "HTTP/1.1 200 ok\r\n"
+            response_headr = "s\ServerPython2.0\r\n"
+            response_body = file_data
+            response_data = (response_line + response_headr + "\r\n").encode() + response_body
+            client_socket.send(response_data)
+        finally:
+            client_socket.close()
+    def start(self):
+            client_socket, client_addr = self.server_socket.accept()
+            print("收到%s的请求" % str(client_addr))
+            gevent.spawn(self.Server_web, client_socket)
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("参数错误")
+        return
+    port = sys.argv[1]
+    if not port.isdigit():
+        print("端口数应该是数字")
+        return
+    port_number = int(port)
+    server = Server_Http(port_number)
+    server.start()
+if __name__ == '__main__':
+    main()
+
+
+
